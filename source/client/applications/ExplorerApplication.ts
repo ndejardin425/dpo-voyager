@@ -228,6 +228,7 @@ Version: ${ENV_VERSION}
     loadDocument(documentPath: string, merge?: boolean, quality?: string): Promise<CVDocument>
     {
         const dq = EDerivativeQuality[quality];
+        this.assetManager.ins.initialLoad.setValue(true);
 
         return this.assetReader.getJSON(documentPath)
             .then(data => {
@@ -240,6 +241,11 @@ Version: ${ENV_VERSION}
                 }
 
                 return document;
+            })
+            .finally(() => {
+                // Make sure load-dependent properties initialized
+                const setup = this.system.getMainComponent(CVDocumentProvider).activeComponent.setup;
+                setup.environment.ins.initialize.set();
             });
     }
 
@@ -388,8 +394,9 @@ Version: ${ENV_VERSION}
             this.setLanguage(props.lang);
         }
 
-        // Make sure environment is properly initialized
-        this.system.getMainComponent(CVDocumentProvider).activeComponent.setup.environment.ins.initialize.set();
+        // Re-cache postload setups
+        const setup = this.system.getMainComponent(CVDocumentProvider).activeComponent.setup;
+        setup.ins.saveState.set();
     }
 
     ////////////////////////////////////////////

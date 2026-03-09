@@ -16,6 +16,7 @@
  */
 
 import { Index } from "@ff/core/types";
+import Vector2 from "@ff/core/Vector2";
 
 import { EUnitType, TUnitType, Vector3, Quaternion, Matrix4, ColorRGB } from "./common";
 import { IMeta } from "./meta";
@@ -28,7 +29,7 @@ import { QuaternionTuple } from "three";
 export { EUnitType, TUnitType, Vector3, Quaternion, Matrix4, ColorRGB };
 
 export type TCameraType = "perspective" | "orthographic";
-export type TLightType = "ambient" | "directional" | "point" | "spot" | "hemisphere" | "rect" | "environment";
+export type TLightType = "ambient" | "directional" | "point" | "spot" | "hemisphere" | "rect" | "environment" | "sun";
 
 /**
  * Encapsulates a node tree representing a renderable scene.
@@ -128,6 +129,7 @@ export interface ILight
     enabled?: boolean;
     color?: ColorRGB;
     intensity?: number;
+    tags?: string;
 
     shadowEnabled?: boolean;
     shadowSize?: number;
@@ -138,6 +140,7 @@ export interface ILight
     point?: IPointLightProps;
     spot?: ISpotLightProps;
     hemisphere?: IHemisphereLightProps;
+    sun?: ISunLightProps;
 }
 
 /**
@@ -160,4 +163,11 @@ export interface ISpotLightProps extends IPointLightProps
 
 export interface IHemisphereLightProps {
     ground :ColorRGB;
+}
+
+export interface ISunLightProps {
+    datetime?: Date;
+    latitude?: number;
+    longitude?: number;
+    intensityFactor?: number;
 }
