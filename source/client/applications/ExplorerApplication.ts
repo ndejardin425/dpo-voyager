@@ -443,21 +443,6 @@ Version: ${ENV_VERSION}
         this.analytics.sendProperty("Reader_Enabled", readerIns.enabled.value);
     }
 
-    enableReader(enabled: boolean)
-    {
-        const reader = this.system.getMainComponent(CVDocumentProvider).activeComponent.setup.reader;
-        const readerIns = reader.ins;
-
-        readerIns.enabled.setValue(enabled);
-        readerIns.focus.setValue(enabled);
-
-        if (enabled) {
-            readerIns.articleId.setValue(reader.articles.length === 1 ? reader.articles[0].article.id : "");
-        }
-
-        this.analytics.sendProperty("Reader_Enabled", enabled);
-    }
-
     toggleTours()
     {
         const tourIns = this.system.getMainComponent(CVDocumentProvider).activeComponent.setup.tours.ins;
