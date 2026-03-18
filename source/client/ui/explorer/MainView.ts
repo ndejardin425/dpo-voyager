@@ -216,10 +216,10 @@ export default class MainView extends CustomElement
         }
     }
 
-    enableAnnotations()
+    enableAnnotations(visible: boolean)
     {
         if(this.application) {
-            this.application.enableAnnotations(true);
+            this.application.enableAnnotations(visible);
         }
     }
 
@@ -230,10 +230,24 @@ export default class MainView extends CustomElement
         }
     }
 
+    enableReader(enabled: boolean)
+    {
+        if(this.application) {
+            this.application.enableReader(enabled);
+        }
+    }
+
     toggleTours()
     {
         if(this.application) {
             this.application.toggleTours();
+        }
+    }
+
+    enableTours(enabled: boolean)
+    {
+        if(this.application) {
+            this.application.enableTours(enabled);
         }
     }
 
@@ -244,10 +258,24 @@ export default class MainView extends CustomElement
         }
     }
 
+    enableTools(visible: boolean)
+    {
+        if(this.application) {
+            this.application.enableTools(visible);
+        }
+    }
+
     toggleMeasurement()
     {
         if(this.application) {
             this.application.toggleMeasurement();
+        }
+    }
+
+    enableMeasurement(visible: boolean)
+    {
+        if(this.application) {
+            this.application.enableMeasurement(visible);
         }
     }
     
