@@ -188,6 +188,7 @@ export default class CVViewer extends Component
         if (ins.activeAnnotation.changed) {
             const id = ins.activeAnnotation.value;
             this.getGraphComponents(CVAnnotationView).forEach(view => view.setActiveAnnotationById(id));
+
         }
         if(ins.annotationExit.changed) {
             ins.annotationsVisible.setValue(false);
