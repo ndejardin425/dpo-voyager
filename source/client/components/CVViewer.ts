@@ -53,8 +53,8 @@ export default class CVViewer extends Component
         annotationExit: types.Event("Annotations.Exit"),
         annotationFocus: types.Boolean("Annotations.Focus", false),
         activeAnnotation: types.String("Annotations.ActiveId"),
-        activeTags: types.String("Tags.Active"),
-        sortedTags: types.String("Tags.Sorted"),
+        activeTags: types.Tags("Tags.Active"),
+        sortedTags: types.Tags("Tags.Sorted"),
         radioTags: types.Boolean("Tags.Radio"),
         shader: types.Enum("Renderer.Shader", EShaderMode),
         variant: types.Option("Renderer.Variant", [], 0),
@@ -67,7 +67,7 @@ export default class CVViewer extends Component
     };
 
     protected static readonly outs = {
-        tagCloud: types.String("Tags.Cloud"),
+        tagCloud: types.Tags("Tags.Cloud"),
         sceneLoaded: types.Boolean("ViewerR.SceneLoaded", false),
     };
 
@@ -127,6 +127,8 @@ export default class CVViewer extends Component
         this.graph.components.on(CLight, this.onLightComponent, this);
         this.graph.components.on(CVAnnotationView, this.onAnnotationsComponent, this);
         this.graph.components.on(CVLanguageManager, this.onLanguageComponent, this);
+        this.graph.components.on(Component, this.onAnyComponent, this);
+        this.outs.tagCloud.on("value", this.onTagCloudUpdate, this);
 
         this.ar.ins.wallMount.linkFrom(this.ins.isWallMountAR);
         this.ar.ins.arScale.linkFrom(this.ins.arScale);
@@ -134,10 +136,12 @@ export default class CVViewer extends Component
 
     dispose()
     {
+        this.outs.tagCloud.off("value", this.onTagCloudUpdate, this);
         this.graph.components.off(CVModel2, this.onModelComponent, this);
         this.graph.components.off(CLight, this.onLightComponent, this);
         this.graph.components.off(CVAnnotationView, this.onAnnotationsComponent, this);
         this.graph.components.off(CVLanguageManager, this.onLanguageComponent, this);
+        this.graph.components.off(Component, this.onAnyComponent, this);
         super.dispose();
     }
 
@@ -202,6 +206,13 @@ export default class CVViewer extends Component
                 const tourIns = setup.tours.ins;
                 this._needsAnnoFocus = ins.annotationsVisible.value && !tourIns.enabled.value;
                 ins.annotationFocus.setValue(false);
+            }
+        }
+        if (ins.radioTags.changed && ins.radioTags.value) {
+            const tagString = ins.activeTags.value;
+            const tags = tagString.split(",");
+            if(tags.length > 1) {
+                ins.activeTags.setValue(tags[0]);
             }
         }
         if (ins.activeTags.changed) {
@@ -311,7 +322,9 @@ export default class CVViewer extends Component
             annotations.forEach(annotation => {
                 const tags = annotation.tags;
                 tags.forEach(tag => {
-                    tagCloud.add(tag)
+                    if(tag !== "Missing content") {
+                        tagCloud.add(tag)
+                    }
                 });
             });
         });
@@ -327,12 +340,51 @@ export default class CVViewer extends Component
 
         this.outs.tagCloud.setValue(tagArray.join(", "));
 
-        // refresh tag display
-        this.ins.activeTags.set();
-        this.ins.annotationsVisible.set();
-
         if (ENV_DEVELOPMENT) {
             console.log("CVViewer.refreshTagCloud - %s", tagArray.join(", "));
+        }
+    }
+
+    protected onTagCloudUpdate()
+    {
+        this.distributeTagOptions();
+        this.ins.activeTags.set();
+        this.ins.annotationsVisible.set();
+    }
+
+    /**
+     * Pushes the current tag cloud as `schema.options` onto every tag-semantic
+     * input property in the graph. Consumers (PropertyTags) pick it up through
+     * the "change" event emitted by Property.setOptions().
+     */
+    protected distributeTagOptions()
+    {
+        const options = this.parseTagCloud();
+        this.graph.components.getArray().forEach(component => {
+            this.seedComponentTagOptions(component, options);
+        });
+    }
+
+    protected parseTagCloud(): string[]
+    {
+        return this.outs.tagCloud.value
+            .split(",").map(t => t.trim()).filter(Boolean);
+    }
+
+    protected seedComponentTagOptions(component: Component, options?: string[])
+    {
+        const opts = options || this.parseTagCloud();
+        component.ins.properties.forEach(property => {
+            if (property.schema.semantic === "tags" && property.schema.options) {
+                property.setOptions(opts);
+            }
+        });
+    }
+
+    protected onAnyComponent(event: IComponentEvent)
+    {
+        if (event.add) {
+            this.seedComponentTagOptions(event.object);
         }
     }
 

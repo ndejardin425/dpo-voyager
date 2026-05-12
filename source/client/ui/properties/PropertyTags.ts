@@ -29,8 +29,7 @@ export default class PropertyTags extends PropertyBase
 {
     type = "string";
 
-    @property({ attribute: false })
-    tagCloud: string[] = [];
+    private _missingContent = false;
 
     @property({ attribute: false })
     protected inputValue = "";
@@ -44,12 +43,14 @@ export default class PropertyTags extends PropertyBase
     protected update(changedProperties: PropertyValues): void
     {
         if (changedProperties.has("property")) {
-            const property = changedProperties.get("property") as Property;
-            if (property) {
-                property.off("value", this.onUpdate, this);
+            const previous = changedProperties.get("property") as Property;
+            if (previous) {
+                previous.off("value", this.onUpdate, this);
+                previous.off("change", this.onUpdate, this);
             }
             if (this.property) {
                 this.property.on("value", this.onUpdate, this);
+                this.property.on("change", this.onUpdate, this);
             }
         }
 
@@ -62,7 +63,8 @@ export default class PropertyTags extends PropertyBase
     }
 
     protected get availableTags(): string[] {
-        return this.tagCloud.filter(t => !this.selectedTags.includes(t));
+        const options = this.property?.schema.options || [];
+        return options.filter(t => !this.selectedTags.includes(t));
     }
 
     protected onAddTag(tag: string) {
@@ -72,6 +74,11 @@ export default class PropertyTags extends PropertyBase
             this.requestUpdate();
             return;
         }
+
+        if (this.selectedTags.includes("Missing content")) {
+            this.property.setValue("");
+        }
+        
         const newTags = [...this.selectedTags, trimmedTag];
         this.property.setValue(newTags.join(", "));
         this.inputValue = "";
@@ -114,15 +121,20 @@ export default class PropertyTags extends PropertyBase
         const selectedTags = this.selectedTags;
         const availableTags = this.availableTags;
         const language = this.language;
+        const missing = selectedTags.includes("Missing content");
 
-        return html`${name ? html`<label class="ff-label ff-off">${name}</label>` : null}
-            <div class="sv-tags-container">
-                <div class="sv-tags-selected">
+        const tagDisplay = html`<div class="sv-tags-selected">
                     ${selectedTags.map(tag => html`<div class="sv-tag-chip">
                         <span class="sv-tag-chip-label">${tag}</span>
                         <ff-button class="sv-tag-chip-remove" icon="close" title=${language ? language.getLocalizedString("Remove tag") : "Remove tag"} @click=${() => this.onRemoveTag(tag)}></ff-button>
                     </div>`)}
-                </div>
+                </div>`;
+
+        const missingDisplay = html`<div class="sv-missing-translation">Missing content</div>`;
+
+        return html`${name ? html`<label class="ff-label ff-off">${name}</label>` : null}
+            <div class="sv-tags-container">
+                ${missing ? missingDisplay : tagDisplay}
                 <select class="sv-property-field" ?disabled=${this.ariaDisabled === "true"} @change=${this.onSelectChange}>
                     <option value="" disabled selected>${language ? language.getLocalizedString("Select...") : "Select..."}</option>
                     ${availableTags.map(tag => html`<option value=${tag}>${tag}</option>`)}
