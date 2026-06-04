@@ -206,7 +206,7 @@ export default class CVDocument extends CRenderGraph
         }
         let worker: Worker;
         try {
-            worker = new Worker(new URL("../io/validateDocument.ts", import.meta.url));
+            worker = new Worker(new URL("../io/validateDocument.ts", import.meta.url), {name: "validateDocument"});
         } catch (e) {
             console.warn("Couldn't validate document: failed to create worker:", (e as Error).message);
             callback?.(null);
