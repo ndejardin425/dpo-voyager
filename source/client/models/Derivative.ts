@@ -130,6 +130,37 @@ export default class Derivative extends Document<IDerivative, IDerivativeJSON>
         return new Derivative(json);
     }
 
+    /**
+     * Destructor for cached model objects. Disposes the variant materials
+     * (created by ModelReader on the KHR_materials_variants path) together
+     * with the object itself.
+     *
+     * This MUST only run when the ref-counted cache entry is actually being
+     * disposed (refcount → 0). Two derivatives sharing the same GLB resolve
+     * to the same cached Object3D; nulling `variantMaterials` on every unload
+     * would corrupt the state of the derivative still using the object.
+     */
+    static disposeModel(model: Object3D)
+    {
+        if (model.userData["variants"]) {
+            const materials = model.userData["variants"].variantMaterials;
+            for (let key_a in materials) {
+                const material = materials[key_a] as Material;
+                if (material) {
+                    for (let key_b in material) {
+                        const texture = material[key_b] as Texture;
+                        if (texture && texture.isTexture) {
+                            texture.dispose();
+                        }
+                    }
+                    material.dispose();
+                }
+            }
+            model.userData["variants"].variantMaterials = null;
+        }
+        disposeObject(model);
+    }
+
     model: Object3D = null;
 
     abortControl :AbortController = null;
@@ -162,7 +193,7 @@ export default class Derivative extends Document<IDerivative, IDerivativeJSON>
             return Derivative._cache.ref(modelAsset.data.uri, ()=>assetReader.getModel(modelAsset.data.uri,  {signal: this.abortControl.signal}))
             .then(object => {
                 if (this.model) {
-                    Derivative._cache.unref(this.model, (model)=>disposeObject(model));
+                    Derivative._cache.unref(this.model, (model)=>Derivative.disposeModel(model));
                 }
                 this.model = object;
                 return object;
@@ -210,25 +241,10 @@ export default class Derivative extends Document<IDerivative, IDerivativeJSON>
     {
         this.abortControl?.abort();
         if (this.model) {
-            // handle disposing variants
-            if(this.model.userData["variants"]) {
-                const materials = this.model.userData["variants"].variantMaterials;
-                for (let key_a in materials) {
-                    const material = materials[key_a] as Material;
-                    if (material) {
-                        for (let key_b in material) {
-                            const texture = material[key_b] as Texture;
-                            if (texture && texture.isTexture) {
-                                texture.dispose();
-                            }
-                        }
-                        material.dispose();
-                    }
-                };
-                this.model.userData["variants"].variantMaterials = null;
-            }
-
-            Derivative._cache.unref(this.model, (model)=>disposeObject(model));
+            // Variant materials are disposed by disposeModel(), but only when the
+            // shared cache entry is actually reclaimed (refcount → 0). Disposing
+            // them here would corrupt a sibling derivative sharing the same GLB.
+            Derivative._cache.unref(this.model, (model)=>Derivative.disposeModel(model));
             this.model = null;
         }
     }
