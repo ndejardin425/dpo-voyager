@@ -25,8 +25,6 @@ import { Dictionary } from "@ff/core/types";
 import { IDocument } from "client/schema/document";
 import { EDerivativeQuality } from "client/schema/model";
 
-import DocumentValidator from "../io/DocumentValidator";
-
 import NVNode, { INodeComponents } from "../nodes/NVNode";
 import NVScene from "../nodes/NVScene";
 
@@ -36,12 +34,14 @@ import CVAssetManager from "./CVAssetManager";
 import CVAnalytics from "client/components/CVAnalytics";
 import { ELanguageType } from "client/schema/common";
 import CVModel2 from "./CVModel2";
+import Notification from "@ff/ui/Notification";
 
 
 ////////////////////////////////////////////////////////////////////////////////
 
 export { IDocument, INodeComponents };
 
+import type { ValidationResult } from "../io/validateDocument";
 
 /**
  * A Voyager document is a special kind of graph. Its inner graph has a standard structure, and it can
@@ -54,7 +54,6 @@ export default class CVDocument extends CRenderGraph
     static readonly mimeType = "application/si-dpo-3d.document+json";
     static readonly version = "1.0";
 
-    protected static readonly validator = new DocumentValidator();
 
     protected titles: Dictionary<string> = {};
     protected intros: Dictionary<string> = {};
@@ -182,6 +181,50 @@ export default class CVDocument extends CRenderGraph
     }
 
     /**
+     * Validates a document against the Voyager JSON-schema. Fire-and-forget —
+     * the callback receives the validation outcome (null on success, an Error
+     * on validation failure). Unexpected worker errors (schema/bundle
+     * problems) are logged to console and do NOT invoke the callback, to
+     * avoid mis-reporting them as "this document is invalid".
+     */
+    validateDocument(documentData: IDocument, callback?: (err: Error | null) => void): void {
+        /** Workers are a "baseline" feature since 2015 so this shouldn't happen much */
+        if(!window.Worker){
+            console.warn("Couldn't validate document: web workers are not supported");
+            callback?.(null);
+            return;
+        }
+        // Cross-origin Worker construction is blocked by browsers. This happens
+        // when the voyager bundle is loaded via <script> from a different
+        // origin than the host page. The URL is recomputed at the `new Worker`
+        // call site because webpack only rewrites the literal
+        // `new Worker(new URL(string, import.meta.url))` pattern.
+        if(new URL("../io/validateDocument.ts", import.meta.url).origin !== window.location.origin){
+            console.warn(`Couldn't validate document: worker script is cross-origin to page ${window.location.origin}`);
+            callback?.(null);
+            return;
+        }
+        let worker: Worker;
+        try {
+            worker = new Worker(new URL("../io/validateDocument.ts", import.meta.url), {name: "validateDocument"});
+        } catch (e) {
+            console.warn("Couldn't validate document: failed to create worker:", (e as Error).message);
+            callback?.(null);
+            return;
+        }
+        worker.onmessage = (ev: MessageEvent<ValidationResult>) => {
+            worker.terminate();
+            const {error} = ev.data;
+            callback?.(error ? new Error(error) : null);
+        };
+        worker.onerror = (ev: ErrorEvent) => {
+            worker.terminate();
+            console.error("CVDocument.validateDocument: unexpected worker error:", ev.message);
+        };
+        worker.postMessage(documentData);
+    }
+
+    /**
      * Loads the document from the given document data. The data is validated first.
      * If a parent node/scene is given, the data is attached to the given parent.
      * @param documentData The document data to be loaded.
@@ -193,10 +236,15 @@ export default class CVDocument extends CRenderGraph
         if (ENV_DEVELOPMENT) {
             console.log("CVDocument.openDocument - assetPath: %s, mergeParent: %s", assetPath, mergeParent);
         }
-
-        if (!CVDocument.validator.validate(documentData)) {
-            throw new Error("document schema validation failed");
-        }
+        if(!assetPath) return; //Don't validate default document
+        this.validateDocument(documentData, (err) => {
+            if (err) {
+                console.error(err);
+                Notification.show(`Document validation failed : ${err.message}`, "error");
+            } else if (ENV_DEVELOPMENT) {
+                console.log(`JSONValidator.validateDocument - OK${assetPath?` (${assetPath})`:""}`);
+            }
+        });
 
         if (!mergeParent) {
             this.clearNodeTree();
