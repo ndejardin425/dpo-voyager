@@ -236,15 +236,16 @@ export default class CVDocument extends CRenderGraph
         if (ENV_DEVELOPMENT) {
             console.log("CVDocument.openDocument - assetPath: %s, mergeParent: %s", assetPath, mergeParent);
         }
-        if(!assetPath) return; //Don't validate default document
-        this.validateDocument(documentData, (err) => {
-            if (err) {
-                console.error(err);
-                Notification.show(`Document validation failed : ${err.message}`, "error");
-            } else if (ENV_DEVELOPMENT) {
-                console.log(`JSONValidator.validateDocument - OK${assetPath?` (${assetPath})`:""}`);
-            }
-        });
+        if(!assetPath) {  //Don't validate default document
+            this.validateDocument(documentData, (err) => {
+                if (err) {
+                    console.error(err);
+                    Notification.show(`Document validation failed : ${err.message}`, "error");
+                } else if (ENV_DEVELOPMENT) {
+                    console.log(`JSONValidator.validateDocument - OK${assetPath?` (${assetPath})`:""}`);
+                }
+            });
+        }
 
         if (!mergeParent) {
             this.clearNodeTree();
@@ -358,13 +359,14 @@ export default class CVDocument extends CRenderGraph
         const meta = event.object;
         const propTitle = this.ins.title;
         const propIntro = this.ins.intro;
-        const language = this.setup.language;
 
         if(this._meta === null) {
             this._meta=meta;
         }
 
         if (event.add && !propTitle.value) {
+            const language = this.setup.language;
+
             meta.once("load", () => {
                 this.titles = meta.collection.get("titles") || {};
                 this.intros = meta.collection.get("intros") || {};
